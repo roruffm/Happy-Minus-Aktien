@@ -1,0 +1,48 @@
+name: KGV-Analyzer - Automatische Aktualisierung
+
+on:
+  schedule:
+    # Alle 5 Minuten ausführen (GitHub Actions erlaubt keine 10-Minuten-Intervalle für kostenlose Konten)
+    - cron: '*/5 * * * *'
+  workflow_dispatch:  # Ermöglicht manuelles Auslösen
+
+jobs:
+  run_kgv_analyzer:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Repository auschecken
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Vollständiger History für Git-Operationen
+
+      - name: Python einrichten
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Abhängigkeiten installieren
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r Happy-Minus-Aktien/requirements.txt
+
+      - name: KGV-Analyzer ausführen
+        id: run_analyzer
+        run: |
+          cd Happy-Minus-Aktien
+          python kgv_analyzer.py
+
+      - name: Ergebnisse committen (falls Änderungen)
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          
+          # Prüfen, ob sich die CSV-Datei geändert hat
+          if [ -f "Happy-Minus-Aktien/unterbewertete_aktien.csv" ]; then
+            git add Happy-Minus-Aktien/unterbewertete_aktien.csv
+            # Nur committen, wenn es Änderungen gibt
+            if ! git diff --cached --quiet; then
+              git commit -m "Aktualisierung der unterbewerteten Aktien - $(date +'%Y-%m-%d %H:%M:%S')"
+              git push
+            fi
+          fi
